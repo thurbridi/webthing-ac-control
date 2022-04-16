@@ -16,14 +16,25 @@ const uint16_t irSendPin = 0;
 IRac ac(irSendPin);
 
 WebThingAdapter *adapter;
-
 const char *acTypes[] = {"Thermostat", nullptr};
 ThingDevice acThing("ac", "AC", acTypes);
+
+void onPowerChange(ThingPropertyValue value) {
+  bool power = value.boolean;
+  ac.next.power = power;
+
+  ac.sendAc();
+  Serial.print(acThing.id);
+  Serial.print(": ");
+  Serial.println(power);
+}
+
 ThingProperty acCurrentTemp("nowtemp", "Current Temperature in Celcius",
                             INTEGER, "TemperatureProperty");
 ThingProperty acTargetTemp("targettemp", "Target Temperature in Celcius",
                            INTEGER, "TargetTemperatureProperty");
-ThingProperty acMode("on", "AC on/off", BOOLEAN, "OnOffProperty");
+ThingProperty acMode("on", "AC on/off", BOOLEAN, "OnOffProperty",
+                     onPowerChange);
 
 bool lastOn = false;
 int lastTemp = 22;
@@ -85,21 +96,12 @@ void setup(void) {
 
 void loop(void) {
   adapter->update();
-  bool mode = acMode.getValue().boolean;
-  digitalWrite(ledPin, mode ? LOW : HIGH);  // active low led
-  ac.next.power = mode ? true : false;      // We want to turn on the A/C
   ac.next.degrees = acTargetTemp.getValue().integer;
 
   ThingPropertyValue temp;
   temp.integer = (int)ac.next.degrees;
   acCurrentTemp.setValue(temp);
 
-  if (mode != lastOn) {
-    ac.sendAc();
-    Serial.print(acThing.id);
-    Serial.print(": ");
-    Serial.println(mode);
-  }
   if (ac.next.degrees != lastTemp) {
     ac.sendAc();
     Serial.print(acThing.id);
@@ -108,5 +110,4 @@ void loop(void) {
     Serial.println("C");
   }
   lastTemp = ac.next.degrees;
-  lastOn = mode;
 }
